@@ -1,31 +1,48 @@
-<script>
-  let buy1m = 0;
-  let buy3m = 0;
-  let buy5m = 0;
-  let buy15m = 0
-  let buy1h = 0;
-  let buylist1m = [];
-  let buylist3m = [];
-  let buylist5m = [];
-  let buylist15m = [];
-  let buylist1h = [];
+<div id="bars"></div>
+<div id="volumes"></div>
+<style>
+  #bars, #volumes {
+    height: 300px;
+    display: flex;
+    flex-flow: row-reverse;
+    align-items: flex-end;
+    justify-content: flex-start;
+  }
 
-  let sell1m = 0;
-  let sell3m = 0;
-  let sell5m = 0;
-  let sell15m = 0;
-  let sell1h = 0;
-  let selllist1m = [];
-  let selllist3m = [];
-  let selllist5m = [];
-  let selllist15m = [];
-  let selllist1h = [];
+  #bars .bar {
+    width: 30px;
+    background: green;
+  }
+  #bars .bar.sell {
+    background: red;
+    transform: translateY(100%);
+  }
+  #volumes .bar {
+    width: 30px;
+    transform: translateY(+50%);
+    background: #04272a;
+  }
+</style>
+<script>
+  let buyVolumes = Array(60).fill(0);
+  let buyList = Array(60).fill().map(() => []);
+  let sellVolumes = Array(60).fill(0);
+  let sellList = Array(60).fill().map(() => []);
+  let bars = document.getElementById('bars');
+  let volumes = document.getElementById('volumes');
+  Array.from(Array(60).keys()).forEach((n) => {
+    bars.appendChild(document.createElement('div'));
+    bars.children[n].classList.add('bar');
+    volumes.appendChild(document.createElement('div'));
+    volumes.children[n].classList.add('bar');
+  })
+
 
   console.log("START")
   let sock = new WebSocket("wss://api2.poloniex.com");
 
   sock.addEventListener('open', () => {
-    console.log("OPENED")
+    console.log("CONNECTED")
     sock.send('{"command":"subscribe","channel":"BTC_ETH"}');
   });
 
@@ -47,19 +64,11 @@
 
 
           if (event[2] === 1) { // Buy
-            buy1m += amount;
-            buy3m += amount;
-            buy5m += amount;
-            buy15m += amount;
-            buy1h += amount;
-            buylist1m.push([timestamp, amount]);
+            buyVolumes[0] += amount;
+            buyList[0].push([timestamp, amount]);
           } else { // Sell
-            sell1m += amount;
-            sell3m += amount;
-            sell5m += amount;
-            sell15m += amount;
-            sell1h += amount;
-            selllist1m.push([timestamp, amount]);
+            sellVolumes[0] += amount;
+            sellList[0].push([timestamp, amount]);
           }
         }
       })
@@ -69,139 +78,50 @@
 
   let update = () => {
     let now = new Date();
-    let old1m = new Date(now.getTime() - 1 * 60000);
-    let old3m = new Date(now.getTime() - 3 * 60000);
-    let old5m = new Date(now.getTime() - 5 * 60000);
-    let old15m = new Date(now.getTime() - 15 * 60000);
-    let old1h = new Date(now.getTime() - 60 * 60000);
     let edge;
-    while (true) {
-      edge = buylist1m.shift();
-      if (edge && edge[0] < old1m) {
-        buy1m -= edge[1];
-        buylist3m.push(edge);
-      } else {
-        if (edge) {
-          buylist1m.unshift(edge);
+    Array.from(Array(60).keys()).forEach((n) => {
+      let testDate =  new Date(now.getTime() - (n + 1) * 60000);
+      while (true) {
+        edge = buyList[n].shift();
+        if (edge && edge[0] < testDate) {
+          buyVolumes[n] -= edge[1];
+          if (buyList[n + 1]) {
+            buyVolumes[n + 1] += edge[1];
+            buyList[n + 1].push(edge);
+          }
+        } else {
+          if (edge) {
+            buyList[n].unshift(edge);
+          }
+          break;
         }
-        break;
       }
-    }
-    while (true) {
-      edge = buylist3m.shift()
-      if (edge && edge[0] < old3m) {
-        buy3m -= edge[1];
-        buylist5m.push(edge);
-      } else {
-        if (edge) {
-          buylist3m.unshift(edge);
+      while (true) {
+        edge = sellList[n].shift();
+        if (edge && edge[0] < testDate) {
+          sellVolumes[n] -= edge[1];
+          if (sellList[n + 1]) {
+            sellVolumes[n + 1] += edge[1]
+            sellList[n + 1].push(edge);
+          }
+        } else {
+          if (edge) {
+            sellList[n].unshift(edge);
+          }
+          break;
         }
-        break;
       }
-    }
-    while (true) {
-      edge = buylist5m.shift()
-      if (edge && edge[0] < old5m) {
-        buy5m -= edge[1];
-        buylist15m.push(edge);
+      let movement = buyVolumes[n] - sellVolumes[n]
+      if (movement < 0) {
+        bars.children[n].classList.add('sell');
       } else {
-        if (edge) {
-          buylist5m.unshift(edge);
-        }
-        break;
+        bars.children[n].classList.remove('sell');
       }
-    }
-    while (true) {
-      edge = buylist15m.shift()
-      if (edge && edge[0] < old15m) {
-        buy15m -= edge[1];
-        buylist1h.push(edge);
-      } else {
-        if (edge) {
-          buylist15m.unshift(edge);
-        }
-        break;
-      }
-    }
-    while (true) {
-      edge = buylist1h.shift()
-      if (edge && edge[0] < old1h) {
-        buy1h -= edge[1];
-      } else {
-        if (edge) {
-          buylist1h.unshift(edge);
-        }
-        break;
-      }
-    }
+      bars.children[n].style = `height:${Math.abs(movement)}px`
 
-
-    while (true) {
-      edge = selllist1m.shift();
-      if (edge && edge[0] < old1m) {
-        sell1m -= edge[1];
-        selllist3m.push(edge);
-      } else {
-        if (edge) {
-          selllist1m.unshift(edge);
-        }
-        break;
-      }
-    }
-    while (true) {
-      edge = selllist3m.shift()
-      if (edge && edge[0] < old3m) {
-        sell3m -= edge[1];
-        selllist5m.push(edge);
-      } else {
-        if (edge) {
-          selllist3m.unshift(edge);
-        }
-        break;
-      }
-    }
-    while (true) {
-      edge = selllist5m.shift()
-      if (edge && edge[0] < old5m) {
-        sell5m -= edge[1];
-        selllist15m.push(edge);
-      } else {
-        if (edge) {
-          selllist5m.unshift(edge);
-        }
-        break;
-      }
-    }
-    while (true) {
-      edge = selllist15m.shift()
-      if (edge && edge[0] < old15m) {
-        sell15m -= edge[1];
-        selllist1h.push(edge);
-      } else {
-        if (edge) {
-          selllist15m.unshift(edge);
-        }
-        break;
-      }
-    }
-    while (true) {
-      edge = selllist1h.shift()
-      if (edge && edge[0] < old1h) {
-        sell1h -= edge[1];
-      } else {
-        if (edge) {
-          selllist1h.unshift(edge);
-        }
-        break;
-      }
-    }
-    console.log("=============================");
-    console.log("       SELL    |   BUY");
-    console.log(" 1M ", sell1m, "| ", buy1m);
-    console.log(" 3M ", sell3m, "| ", buy3m);
-    console.log(" 5M ", sell5m, "| ", buy5m);
-    console.log("15M ", sell15m, "| ", buy15m);
-    console.log(" 1h ", sell1h, "| ", buy1h);
+      let volumeBar = document.createElement('div');
+      volumes.children[n].style = `height:${buyVolumes[n] + sellVolumes[n]}px`
+    })
   }
   let loop = setInterval(update, 5000)
 </script>
