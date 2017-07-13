@@ -1,40 +1,48 @@
-<div id="bars"></div>
+<div id="movements"></div>
 <div id="volumes"></div>
+<div id="movementaverages"></div>
+<div id="volumeaverages"></div>
 <style>
-  #bars, #volumes {
-    height: 300px;
+  #movements, #volumes, #movementaverages, #volumeaverages {
+    height: 200px;
     display: flex;
     flex-flow: row-reverse;
     align-items: flex-end;
     justify-content: flex-start;
   }
 
-  #bars .bar {
+  .bar {
     width: 30px;
     background: green;
   }
-  #bars .bar.sell {
+  .bar.sell {
     background: red;
     transform: translateY(100%);
   }
-  #volumes .bar {
-    width: 30px;
-    transform: translateY(+50%);
+  #volumes .bar, #volumeaverages .bar {
     background: #04272a;
+    transform: translateY(+50%);
   }
 </style>
 <script>
-  let buyVolumes = Array(60).fill(0);
-  let buyList = Array(60).fill().map(() => []);
-  let sellVolumes = Array(60).fill(0);
-  let sellList = Array(60).fill().map(() => []);
-  let bars = document.getElementById('bars');
+  const MAXSIZE = 360;
+  let buyVolumes = Array(MAXSIZE).fill(0);
+  let buyList = Array(MAXSIZE).fill().map(() => []);
+  let sellVolumes = Array(MAXSIZE).fill(0);
+  let sellList = Array(MAXSIZE).fill().map(() => []);
+  let movements = document.getElementById('movements');
   let volumes = document.getElementById('volumes');
-  Array.from(Array(60).keys()).forEach((n) => {
-    bars.appendChild(document.createElement('div'));
-    bars.children[n].classList.add('bar');
+  let movementaverages = document.getElementById('movementaverages');
+  let volumeaverages = document.getElementById('volumeaverages');
+  Array.from(Array(MAXSIZE).keys()).forEach((n) => {
+    movements.appendChild(document.createElement('div'));
+    movements.children[n].classList.add('bar');
     volumes.appendChild(document.createElement('div'));
     volumes.children[n].classList.add('bar');
+    movementaverages.appendChild(document.createElement('div'));
+    movementaverages.children[n].classList.add('bar');
+    volumeaverages.appendChild(document.createElement('div'));
+    volumeaverages.children[n].classList.add('bar');
   })
 
 
@@ -79,8 +87,8 @@
   let update = () => {
     let now = new Date();
     let edge;
-    Array.from(Array(60).keys()).forEach((n) => {
-      let testDate =  new Date(now.getTime() - (n + 1) * 60000);
+    Array.from(Array(360).keys()).forEach((n) => {
+      let testDate =  new Date(now.getTime() - (n + 1) * 10000);
       while (true) {
         edge = buyList[n].shift();
         if (edge && edge[0] < testDate) {
@@ -111,16 +119,37 @@
           break;
         }
       }
-      let movement = buyVolumes[n] - sellVolumes[n]
-      if (movement < 0) {
-        bars.children[n].classList.add('sell');
-      } else {
-        bars.children[n].classList.remove('sell');
-      }
-      bars.children[n].style = `height:${Math.abs(movement)}px`
+    })
 
-      let volumeBar = document.createElement('div');
-      volumes.children[n].style = `height:${buyVolumes[n] + sellVolumes[n]}px`
+
+    let movement = 0;
+    let volume = 0;
+    Array.from(Array(MAXSIZE + 20).keys()).forEach((n) => {
+      movement += (buyVolumes[n] - sellVolumes[n])
+      volume += (buyVolumes[n] + sellVolumes[n])
+      if (n - 20 >= 0) {
+        movement -= (buyVolumes[n - 20] - sellVolumes[n - 20])
+        volume -= (buyVolumes[n - 20] + sellVolumes[n - 20])
+        if (movement < 0) {
+          movementaverages.children[n - 20].classList.add('sell');
+        } else {
+          movementaverages.children[n - 20].classList.remove('sell');
+        }
+        movementaverages.children[n - 20].style = `height:${Math.abs(movement * 3)}px`;
+        volumeaverages.children[n - 20].style = `height:${volume * 3}px`;
+      } else {
+        movementaverages.children[0].style = `height:${Math.abs(movement * 3)}px`;
+        volumeaverages.children[0].style = `height:${volume * 3}px`;
+      }
+      if (n < MAXSIZE) {
+        movements.children[n].style = `height:${Math.abs(buyVolumes[n] - sellVolumes[n]) * 6}px`;
+        if (buyVolumes[n] - sellVolumes[n] < 0) {
+          movements.children[n].classList.add('sell')
+        } else {
+          movements.children[n].classList.remove('sell')
+        }
+        volumes.children[n].style = `height:${(buyVolumes[n] + sellVolumes[n]) * 6}px`;
+      }
     })
   }
   let loop = setInterval(update, 5000)
