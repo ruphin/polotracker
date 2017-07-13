@@ -1,48 +1,78 @@
-<div id="movements"></div>
-<div id="volumes"></div>
-<div id="movementaverages"></div>
-<div id="volumeaverages"></div>
+<div id="timecounter"></div>
+<div id="charts">
+  <div class="chart" id="movements"></div>
+  <div class="chart" id="volumes"></div>
+  <div class="chart" id="movementaverages"></div>
+  <div class="chart" id="volumeaverages"></div>
+</div>
 <style>
-  #movements, #volumes, #movementaverages, #volumeaverages {
-    height: 200px;
+  body {
+    --chart-height: 260px;
+    margin: 0;
+    padding: 30px;
+  }
+  .chart {
+    height: var(--chart-height);
     display: flex;
     flex-flow: row-reverse;
     align-items: flex-end;
     justify-content: flex-start;
+    border: 1px solid #2f3d45;
+  }
+  .chart:not(:last-child) {
+    border-bottom: none;
   }
 
   .bar {
-    width: 30px;
-    background: green;
+    width: 3px;
+    background: #639F4D;
+    transform: translateY(calc(var(--chart-height) / -2));
   }
   .bar.sell {
-    background: red;
-    transform: translateY(100%);
+    background: #AD092E;
+    transform: translateY(calc(var(--chart-height) / -2 + 100%));
   }
   #volumes .bar, #volumeaverages .bar {
-    background: #04272a;
-    transform: translateY(+50%);
+    background: #2f3d45;
+    transform: translateY(calc(var(--chart-height) / -2 + 50%));
+  }
+  #timeCounter {
+    position: absolute;
+    top: 31px;
+    left: 33px;
   }
 </style>
 <script>
-  const MAXSIZE = 360;
-  let buyVolumes = Array(MAXSIZE).fill(0);
-  let buyList = Array(MAXSIZE).fill().map(() => []);
-  let sellVolumes = Array(MAXSIZE).fill(0);
-  let sellList = Array(MAXSIZE).fill().map(() => []);
+  const TIMESPAN = 3600; // Total seconds in monitoring window
+  const INTERVALS = 360; // Number of intervals in that window to track
+  const SLIDING_WINDOW = 12; // Number of intervals in the sliding window (2 mins)
+  const MILLISECS = 1000;
+
+  let buyVolumes = Array(INTERVALS).fill(0);
+  let buyList = Array(INTERVALS).fill().map(() => []);
+  let sellVolumes = Array(INTERVALS).fill(0);
+  let sellList = Array(INTERVALS).fill().map(() => []);
   let movements = document.getElementById('movements');
   let volumes = document.getElementById('volumes');
   let movementaverages = document.getElementById('movementaverages');
   let volumeaverages = document.getElementById('volumeaverages');
-  Array.from(Array(MAXSIZE).keys()).forEach((n) => {
+  let timeCounter = document.getElementById('timecounter')
+  Array.from(Array(INTERVALS).keys()).forEach((n) => {
+    let bar = document.createElement('div');
     movements.appendChild(document.createElement('div'));
-    movements.children[n].classList.add('bar');
-    volumes.appendChild(document.createElement('div'));
-    volumes.children[n].classList.add('bar');
     movementaverages.appendChild(document.createElement('div'));
-    movementaverages.children[n].classList.add('bar');
+    volumes.appendChild(document.createElement('div'));
     volumeaverages.appendChild(document.createElement('div'));
+    movements.children[n].classList.add('bar');
+    movementaverages.children[n].classList.add('bar');
+    volumes.children[n].classList.add('bar');
     volumeaverages.children[n].classList.add('bar');
+  })
+
+  document.getElementById('charts').addEventListener("mouseover", (e) => {
+    if (e.target.classList.contains('bar')) {
+      timeCounter.innerHTML = new Date(new Date().getTime() - ((Array.from(e.target.parentElement.children).indexOf(e.target)) + 1) * TIMESPAN / INTERVALS * MILLISECS).toTimeString();
+    }
   })
 
 
@@ -68,7 +98,7 @@
       tx[2].forEach((event) => {
         if (event[0] === "t") { // Trade event
           amount = Number(event[3]) * Number(event[4]);
-          timestamp = new Date(Number(event[5]) * 1000);
+          timestamp = new Date(Number(event[5]) * MILLISECS);
 
 
           if (event[2] === 1) { // Buy
@@ -87,8 +117,8 @@
   let update = () => {
     let now = new Date();
     let edge;
-    Array.from(Array(360).keys()).forEach((n) => {
-      let testDate =  new Date(now.getTime() - (n + 1) * 10000);
+    Array.from(Array(INTERVALS).keys()).forEach((n) => {
+      let testDate =  new Date(now.getTime() - (n + 1) * TIMESPAN / INTERVALS * MILLISECS);
       while (true) {
         edge = buyList[n].shift();
         if (edge && edge[0] < testDate) {
@@ -124,33 +154,33 @@
 
     let movement = 0;
     let volume = 0;
-    Array.from(Array(MAXSIZE + 20).keys()).forEach((n) => {
+    Array.from(Array(INTERVALS + SLIDING_WINDOW).keys()).forEach((n) => {
       movement += (buyVolumes[n] - sellVolumes[n])
       volume += (buyVolumes[n] + sellVolumes[n])
-      if (n - 20 >= 0) {
-        movement -= (buyVolumes[n - 20] - sellVolumes[n - 20])
-        volume -= (buyVolumes[n - 20] + sellVolumes[n - 20])
+      if (n - SLIDING_WINDOW >= 0) {
+        movement -= (buyVolumes[n - SLIDING_WINDOW] - sellVolumes[n - SLIDING_WINDOW])
+        volume -= (buyVolumes[n - SLIDING_WINDOW] + sellVolumes[n - SLIDING_WINDOW])
         if (movement < 0) {
-          movementaverages.children[n - 20].classList.add('sell');
+          movementaverages.children[n - SLIDING_WINDOW].classList.add('sell');
         } else {
-          movementaverages.children[n - 20].classList.remove('sell');
+          movementaverages.children[n - SLIDING_WINDOW].classList.remove('sell');
         }
-        movementaverages.children[n - 20].style = `height:${Math.abs(movement * 3)}px`;
-        volumeaverages.children[n - 20].style = `height:${volume * 3}px`;
+        movementaverages.children[n - SLIDING_WINDOW].style = `height:${Math.abs(movement)}px`;
+        volumeaverages.children[n - SLIDING_WINDOW].style = `height:${volume}px`;
       } else {
-        movementaverages.children[0].style = `height:${Math.abs(movement * 3)}px`;
-        volumeaverages.children[0].style = `height:${volume * 3}px`;
+        movementaverages.children[0].style = `height:${Math.abs(movement)}px`;
+        volumeaverages.children[0].style = `height:${volume}px`;
       }
-      if (n < MAXSIZE) {
-        movements.children[n].style = `height:${Math.abs(buyVolumes[n] - sellVolumes[n]) * 6}px`;
+      if (n < INTERVALS) {
+        movements.children[n].style = `height:${Math.abs(buyVolumes[n] - sellVolumes[n]) * 2}px`;
         if (buyVolumes[n] - sellVolumes[n] < 0) {
           movements.children[n].classList.add('sell')
         } else {
           movements.children[n].classList.remove('sell')
         }
-        volumes.children[n].style = `height:${(buyVolumes[n] + sellVolumes[n]) * 6}px`;
+        volumes.children[n].style = `height:${(buyVolumes[n] + sellVolumes[n]) * 2}px`;
       }
     })
   }
-  let loop = setInterval(update, 5000)
+  let loop = setInterval(update, TIMESPAN / INTERVALS * MILLISECS)
 </script>
