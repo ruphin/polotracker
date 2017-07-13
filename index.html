@@ -12,6 +12,7 @@
     padding: 30px;
   }
   .chart {
+    position: relative;
     height: var(--chart-height);
     display: flex;
     flex-flow: row-reverse;
@@ -22,6 +23,28 @@
   .chart:not(:last-child) {
     border-bottom: none;
   }
+
+  #movements::after, #volumes::after, #movementaverages::after, #volumeaverages::after {
+    display: inline-block;
+    position: absolute;
+    bottom: 1px;
+    left: 3px;
+  }
+
+
+  #movements::after {
+    content: "Net Volume / 10s";
+  }
+  #volumes::after {
+    content: "Total Volume / 10s";
+  }
+  #movementaverages::after {
+    content: "Net Volume / 2m";
+  }
+  #volumeaverages::after {
+    content: "Total Volume / 2m";
+  }
+
 
   .bar {
     width: 3px;
